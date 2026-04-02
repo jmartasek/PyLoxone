@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from functools import cached_property
 from typing import Literal, final
 
 import homeassistant.helpers.config_validation as cv
@@ -75,10 +76,17 @@ async def async_setup_entry(
         sensor.update({"type": "presence"})
         entities.append(LoxoneDigitalSensor(**sensor))
 
-    for sensor in get_all(loxconfig, "SmokeAlarm"):
-        sensor = add_room_and_cat_to_value_values(loxconfig, sensor)
-        sensor.update({"type": "smoke"})
-        entities.append(LoxoneDigitalSensor(**sensor))
+    for smoke_control in get_all(loxconfig, "SmokeAlarm"):
+        smoke_control = add_room_and_cat_to_value_values(loxconfig, smoke_control)
+        smoke_control.update({"type": "smoke"})
+        entities.append(LoxoneDigitalSensor(**smoke_control))
+
+        # Add second sensor for level state (correct semantics)
+        if "level" in smoke_control.get("states", {}):
+            smoke_level = add_room_and_cat_to_value_values(
+                loxconfig, smoke_control.copy()
+            )
+            entities.append(LoxoneSmokeAlarmLevelSensor(**smoke_level))
 
     @callback
     def async_add_binary_sensors(_):
@@ -116,10 +124,18 @@ class LoxoneDigitalSensor(LoxoneEntity, BinarySensorEntity):
             self._from_loxone_config = True
             if self.type == "smoke":
                 self._state_uuid = self.states["areAlarmSignalsOff"]
-            if self.type == "presence":
+            elif self.type == "presence":
                 self._state_uuid = self.states["active"]
             elif "active" in self.states:
                 self._state_uuid = self.uuidAction
+            else:
+                self._state_uuid = self.uuidAction
+
+            # Set HA device_class for auto-discovered controls
+            if self.type == "presence":
+                self._attr_device_class = BinarySensorDeviceClass.OCCUPANCY
+            elif self.type == "smoke":
+                self._attr_device_class = BinarySensorDeviceClass.SMOKE
         else:
             self._state_uuid = self.uuidAction
 
@@ -160,6 +176,19 @@ class LoxoneDigitalSensor(LoxoneEntity, BinarySensorEntity):
                 }
             )
 
+    @property
+    def icon(self):
+        if self._from_loxone_config:
+            if self.type == "digital":
+                return "mdi:checkbox-blank-circle-outline"
+        else:
+            if self.device_class:
+                if self.device_class == "digital":
+                    return "mdi:checkbox-blank-circle-outline"
+            else:
+                return "mdi:checkbox-blank-circle-outline"
+
+
     async def event_handler(self, e):
         if self._state_uuid in e.data:
             self._state = e.data[self._state_uuid]
@@ -183,6 +212,67 @@ class LoxoneDigitalSensor(LoxoneEntity, BinarySensorEntity):
     def is_on(self) -> bool | None:
         """Return true if sensor is on."""
         return self._state == self._on_state
+
+
+class LoxoneSmokeAlarmLevelSensor(LoxoneEntity, BinarySensorEntity):
+    """Smoke alarm level binary sensor with correct semantics.
+
+    Uses the 'level' state where level >= 1 means Pre-Alarm or Main Alarm.
+    This provides correct semantics: ON when alarm is active, OFF when silent.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._attr_device_class = BinarySensorDeviceClass.SMOKE
+        self._state_uuid = self.states.get("level")
+        self._state = STATE_UNKNOWN
+        self._attr_available = True
+        self._on_state = STATE_ON
+        self._off_state = STATE_OFF
+
+        # Create derived name to distinguish from original sensor
+        self._attr_name = f"{self.name} (Alarm Level)"
+
+        # Group with the original smoke sensor via shared device_info
+        self._attr_device_info = get_or_create_device(
+            self.unique_id, self.name, self.type, self.room
+        )
+
+        self._attr_extra_state_attributes.update(
+            {
+                "state_uuid": self._state_uuid,
+                "device_type": "smoke_alarm_level",
+            }
+        )
+
+    async def event_handler(self, e):
+        """Handle state updates from Loxone.
+
+        level >= 1 means alarm is active (Pre-Alarm=1 or Main Alarm=2).
+        level < 1 means no alarm.
+        """
+        if self._state_uuid and self._state_uuid in e.data:
+            level = e.data[self._state_uuid]
+            self._state = self._on_state if level >= 1 else self._off_state
+            self.async_schedule_update_ha_state()
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return true if alarm is active."""
+        return self._state == self._on_state
+
+    @final
+    @property
+    def state(self) -> Literal["on", "off"] | None:
+        """Return the state of the binary sensor."""
+        if (is_on := self.is_on) is None:
+            return None
+        return STATE_ON if is_on else STATE_OFF
+
+    @cached_property
+    def unique_id(self) -> str:
+        """Return unique ID with _level suffix to distinguish from original sensor."""
+        return f"{self.uuidAction}_level"
 
 
 class LoxoneCustomBinarySensor(LoxoneEntity, BinarySensorEntity):

@@ -8,8 +8,10 @@ from typing import Literal, final
 
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
-from homeassistant.components.binary_sensor import (BinarySensorDeviceClass,
-                                                    BinarySensorEntity)
+from homeassistant.components.binary_sensor import (PLATFORM_SCHEMA,
+                                                    BinarySensorDeviceClass,
+                                                    BinarySensorEntity,
+                                                    BinarySensorEntityDescription)
 from homeassistant.components.sensor import CONF_STATE_CLASS
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (CONF_DEVICE_CLASS, CONF_NAME,
@@ -34,6 +36,77 @@ LOXONE_DEVICE_CLASS_MAP: dict[str, BinarySensorDeviceClass] = {
     "presence": BinarySensorDeviceClass.PRESENCE,
     "smoke": BinarySensorDeviceClass.SMOKE,
 }
+
+
+class LoxoneBinarySensorDescription(BinarySensorEntityDescription, frozen_or_thawed=True):
+    """Describes a Loxone binary sensor entity.
+
+    Mirrors LoxoneEntityDescription from sensor.py. For known control types
+    (PresenceDetector, SmokeAlarm), loxone_type alone is sufficient.
+    For InfoOnlyDigital, name_keywords disambiguate door/window/light.
+    """
+
+    loxone_type: str
+    name_keywords: tuple[str, ...] = ()
+
+
+BINARY_SENSOR_TYPES: tuple[LoxoneBinarySensorDescription, ...] = (
+    # --- Unambiguous: known control types ---
+    LoxoneBinarySensorDescription(
+        key="occupancy",
+        loxone_type="presence",
+        device_class=BinarySensorDeviceClass.OCCUPANCY,
+    ),
+    LoxoneBinarySensorDescription(
+        key="smoke",
+        loxone_type="smoke",
+        device_class=BinarySensorDeviceClass.SMOKE,
+    ),
+    # --- InfoOnlyDigital: name-keyword disambiguation (CZ/EN/DE/FR) ---
+    LoxoneBinarySensorDescription(
+        key="door",
+        loxone_type="digital",
+        name_keywords=("dveře", "dvere", "door", "tür", "tuer", "porte"),
+        device_class=BinarySensorDeviceClass.DOOR,
+    ),
+    LoxoneBinarySensorDescription(
+        key="window",
+        loxone_type="digital",
+        name_keywords=("okno", "window", "fenster", "fenêtre", "fenetre"),
+        device_class=BinarySensorDeviceClass.WINDOW,
+    ),
+    LoxoneBinarySensorDescription(
+        key="light",
+        loxone_type="digital",
+        name_keywords=(
+            "světlo", "svetlo", "lampička", "lampicka", "lampa",
+            "light", "lamp",
+            "licht", "lampe", "leuchte",
+            "lumière", "lumiere",
+        ),
+        device_class=BinarySensorDeviceClass.LIGHT,
+    ),
+)
+
+
+def match_binary_sensor_description(
+    loxone_type: str, name: str = "",
+) -> LoxoneBinarySensorDescription | None:
+    """Find the first matching description for a Loxone binary sensor.
+
+    Known control types (presence, smoke) match immediately.
+    InfoOnlyDigital ("digital") requires a keyword hit in name.
+    Returns None if no description matches.
+    """
+    name_lower = name.lower()
+    for desc in BINARY_SENSOR_TYPES:
+        if loxone_type != desc.loxone_type:
+            continue
+        if not desc.name_keywords:
+            return desc
+        if any(kw in name_lower for kw in desc.name_keywords):
+            return desc
+    return None
 
 
 async def async_setup_platform(
@@ -131,11 +204,10 @@ class LoxoneDigitalSensor(LoxoneEntity, BinarySensorEntity):
             else:
                 self._state_uuid = self.uuidAction
 
-            # Set HA device_class for auto-discovered controls
-            if self.type == "presence":
-                self._attr_device_class = BinarySensorDeviceClass.OCCUPANCY
-            elif self.type == "smoke":
-                self._attr_device_class = BinarySensorDeviceClass.SMOKE
+            # Set HA device_class via description matching
+            desc = match_binary_sensor_description(self.type, self.name)
+            if desc:
+                self.entity_description = desc
         else:
             self._state_uuid = self.uuidAction
 
@@ -178,15 +250,9 @@ class LoxoneDigitalSensor(LoxoneEntity, BinarySensorEntity):
 
     @property
     def icon(self):
-        if self._from_loxone_config:
-            if self.type == "digital":
-                return "mdi:checkbox-blank-circle-outline"
-        else:
-            if self.device_class:
-                if self.device_class == "digital":
-                    return "mdi:checkbox-blank-circle-outline"
-            else:
-                return "mdi:checkbox-blank-circle-outline"
+        if self.device_class:
+            return None  # Let HA choose icon based on device_class
+        return "mdi:checkbox-blank-circle-outline"
 
 
     async def event_handler(self, e):

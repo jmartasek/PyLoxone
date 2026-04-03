@@ -93,6 +93,24 @@ async def async_unload_entry(hass, config_entry):
 
     # Connection close
     if coordinator is not None:
+        # Cancel schematics task if still running
+        schematics_task = getattr(coordinator, "_schematics_task", None)
+        if schematics_task is not None and not schematics_task.done():
+            schematics_task.cancel()
+
+        # Remove schematics dashboard panel
+        try:
+            from homeassistant.components.frontend import async_remove_panel
+            from homeassistant.components.lovelace.const import LOVELACE_DATA
+
+            url_path = f"loxone-schematics-{config_entry.entry_id[:8]}"
+            async_remove_panel(hass, url_path, warn_if_unknown=False)
+            lovelace_data = hass.data.get(LOVELACE_DATA)
+            if lovelace_data and url_path in lovelace_data.dashboards:
+                del lovelace_data.dashboards[url_path]
+        except Exception:
+            pass
+
         try:
             await coordinator.async_cleanup()
         except Exception as e:
@@ -630,6 +648,14 @@ async def async_setup_entry(hass, config_entry):
     ]
 
     await start_event()
+
+    # Generate schematics dashboard if SystemScheme controls exist
+    from .schematics import async_setup_schematics
+
+    schematics_task = hass.async_create_task(
+        async_setup_schematics(hass, config_entry, coordinator)
+    )
+    coordinator._schematics_task = schematics_task
 
     return True
 

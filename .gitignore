@@ -47,3 +47,6 @@ config/*
 !config/configuration.yaml
 
 tmp*
+
+node_modules
+tools

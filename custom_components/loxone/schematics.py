@@ -36,12 +36,13 @@ _ELEMENT_MAP: dict[str, tuple[str, str]] = {
 # Domains that show values — get a readable label style on the floor plan
 _LABEL_DOMAINS = {"sensor", "binary_sensor", "number"}
 _LABEL_STYLE = {
-    "font-size": "12px",
-    "font-weight": "bold",
+    "font-size": "0.9vw",
     "color": "white",
-    "background-color": "rgba(0, 0, 0, 0.6)",
-    "border-radius": "4px",
-    "padding": "2px 6px",
+    "background-color": "rgba(0, 0, 0, 0.65)",
+    "border-radius": "3px",
+    "transform": "scale(0.85)",
+    "transform-origin": "center center",
+    "line-height": "1.1",
     "white-space": "nowrap",
 }
 
@@ -282,7 +283,7 @@ def _build_picture_elements_card(
 
         elements.append(element)
 
-    _LOGGER.info(
+    _LOGGER.debug(
         "Schematic '%s': mapped %d of %d controls to entities",
         ctrl.get("name"),
         matched,

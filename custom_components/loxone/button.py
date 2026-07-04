@@ -18,7 +18,7 @@ from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 from homeassistant.util import dt as dt_util
 
 from . import LoxoneEntity
-from .const import DOMAIN, SENDDOMAIN
+from .const import DOMAIN, PUSHBUTTON_TYPE_SCENE, SENDDOMAIN
 from .helpers import add_room_and_cat_to_value_values, get_all
 from .miniserver import get_miniserver_from_hass
 
@@ -46,6 +46,8 @@ async def async_setup_entry(
     entities = []
 
     for button_entity in get_all(loxconfig, ["Pushbutton"]):
+        if button_entity.get("details", {}).get("type") == PUSHBUTTON_TYPE_SCENE:
+            continue  # Native Loxone scenes — handled by scene platform
         button_entity = add_room_and_cat_to_value_values(loxconfig, button_entity)
         entities.append(LoxoneButton(**button_entity))
 

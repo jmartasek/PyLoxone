@@ -61,6 +61,9 @@ DEFAULT_FORCE_UPDATE = False
 SUPPORT_SUN_AUTOMATION = 1024
 SUPPORT_QUICK_SHADE = 2048
 
+# Loxone Pushbutton detail types
+PUSHBUTTON_TYPE_SCENE = 511  # Native Loxone scene (command sequence)
+
 SERVICE_ENABLE_SUN_AUTOMATION = "enable_sun_automation"
 SERVICE_DISABLE_SUN_AUTOMATION = "disable_sun_automation"
 SERVICE_QUICK_SHADE = "quick_shade"

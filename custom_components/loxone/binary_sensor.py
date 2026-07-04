@@ -216,11 +216,25 @@ class LoxoneDigitalSensor(LoxoneEntity, BinarySensorEntity):
         self._parent_id = kwargs.get("parent_id", None)
         self._on_state = STATE_ON
         self._off_state = STATE_OFF
+
+        # Detect inverted sensors from Loxone details.text mapping.
+        # Loxone reports 1.0 for "on" state, but if text.on means "Closed"
+        # then the sensor logic is inverted relative to HA conventions
+        # (where on = open for door/window device classes).
+        self._inverted = False
+        text = kwargs.get("details", {}).get("text", {})
+        if text:
+            on_text = text.get("on", "").lower()
+            # If Loxone's "on" (1.0) means closed/zu/fermé, invert for HA
+            if on_text in ("closed", "zu", "fermé", "ferme", "zavřeno", "zavreno"):
+                self._inverted = True
+
         self._attr_available = True
-        if self.type in LOXONE_DEVICE_CLASS_MAP:
-            self._attr_device_class = LOXONE_DEVICE_CLASS_MAP[self.type]
-        else:
-            self._attr_device_class = None
+        if not hasattr(self, "entity_description"):
+            if self.type in LOXONE_DEVICE_CLASS_MAP:
+                self._attr_device_class = LOXONE_DEVICE_CLASS_MAP[self.type]
+            else:
+                self._attr_device_class = None
 
         if self._parent_id:
             self.uuidAction = self._parent_id
@@ -257,11 +271,11 @@ class LoxoneDigitalSensor(LoxoneEntity, BinarySensorEntity):
 
     async def event_handler(self, e):
         if self._state_uuid in e.data:
-            self._state = e.data[self._state_uuid]
-            if self._state == 1.0:
-                self._state = self._on_state
-            else:
-                self._state = self._off_state
+            data_val = e.data[self._state_uuid]
+            active = data_val == 1.0
+            if self._inverted:
+                active = not active
+            self._state = self._on_state if active else self._off_state
             if not self._attr_available:
                 self._attr_available = True
             self.async_schedule_update_ha_state()

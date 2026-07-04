@@ -1,4 +1,18 @@
 {
+  "entity": {
+    "climate": {
+      "room_controller_v2": {
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "schedule": "Zeitplan",
+              "paused_door_window": "Pausiert (Tür/Fenster)"
+            }
+          }
+        }
+      }
+    }
+  },
   "config": {
     "abort": {
       "single_instance_allowed": "Bereits konfiguriert"

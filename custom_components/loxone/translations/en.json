@@ -1,4 +1,18 @@
 {
+  "entity": {
+    "climate": {
+      "room_controller_v2": {
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "schedule": "Schedule",
+              "paused_door_window": "Paused (Door/Window)"
+            }
+          }
+        }
+      }
+    }
+  },
   "config": {
     "abort": {
       "single_instance_allowed": "Already configured. Only a single configuration possible."

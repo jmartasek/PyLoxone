@@ -1,0 +1,16 @@
+{
+  "entity": {
+    "climate": {
+      "room_controller_v2": {
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "schedule": "Časový plán",
+              "paused_door_window": "Pozastaveno (Dveře/Okno)"
+            }
+          }
+        }
+      }
+    }
+  }
+}

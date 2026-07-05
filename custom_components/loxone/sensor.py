@@ -56,15 +56,15 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
 )
 
 OVERRIDE_REASONS = {
-    0: "None",
-    1: "Presence",
-    2: "Window Open",
-    3: "Comfort Override",
-    4: "Eco Override",
-    5: "Eco+ Override",
-    6: "Prepare State Heat Up",
-    7: "Prepare State Cool Down",
-    8: "Overridden by source",
+    0: "none",
+    1: "presence",
+    2: "window_open",
+    3: "comfort_override",
+    4: "eco_override",
+    5: "eco_plus_override",
+    6: "prepare_heat_up",
+    7: "prepare_cool_down",
+    8: "overridden_by_source",
 }
 
 
@@ -577,13 +577,14 @@ class LoxoneRoomControllerOverrideSensor(SensorEntity):
 
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_translation_key = "override_reason"
 
     def __init__(self, name: str, uuid: str, device_info: DeviceInfo, parent_uuid: str):
         self._attr_name = name
         self._uuid = uuid
         self._attr_unique_id = uuid
         self._attr_device_info = device_info
-        self._attr_native_value = "None"
+        self._attr_native_value = "none"
         self._attr_options = list(OVERRIDE_REASONS.values())
         self._parent_uuid = parent_uuid
 

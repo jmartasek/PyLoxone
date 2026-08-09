@@ -18,7 +18,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt mypy
       - name: Run mypy
-        run: mypy custom_components/loxone/ --ignore-missing-imports --check-untyped-defs --exclude 'pyloxone_api'
+        run: mypy custom_components/loxone/
 
   test:
     name: Tests (pytest)

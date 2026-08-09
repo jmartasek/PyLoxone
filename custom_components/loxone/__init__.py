@@ -151,18 +151,24 @@ async def async_setup(hass, config):
 
 
 async def async_migrate_entry(hass, config_entry):
-    # _LOGGER.debug("Migrating from version %s", config_entry.version)
-    if config_entry.version == 1:
-        new = {**config_entry.options, CONF_LIGHTCONTROLLER_SUBCONTROLS_GEN: True}
-        config_entry.options = {**new}
-        config_entry.version = 2
+    new_options = {**config_entry.options}
+    new_version = config_entry.version
+
+    if new_version == 1:
+        new_options[CONF_LIGHTCONTROLLER_SUBCONTROLS_GEN] = True
+        new_version = 2
         _LOGGER.info("Migration to version %s successful", 2)
 
-    if config_entry.version == 2:
-        new = {**config_entry.options, CONF_SCENE_GEN_DELAY: DEFAULT_DELAY_SCENE}
-        config_entry.options = {**new}
-        config_entry.version = 3
+    if new_version == 2:
+        new_options[CONF_SCENE_GEN_DELAY] = DEFAULT_DELAY_SCENE
+        new_version = 3
         _LOGGER.info("Migration to version %s successful", 3)
+
+    if new_version != config_entry.version:
+        hass.config_entries.async_update_entry(
+            config_entry, options=new_options, version=new_version
+        )
+
     return True
 
 
